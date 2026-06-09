@@ -1,0 +1,11 @@
+[Unit]
+Description=Run daily-update.service every day at 04:00 local
+
+[Timer]
+OnCalendar=*-*-* 04:00:00
+Persistent=true
+RandomizedDelaySec=5min
+Unit=daily-update.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Poll every 15 min for a deferred daily-update retry
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Unit=daily-update-retry.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry deferred daily apt update+upgrade
+ConditionPathExists=/var/lib/daily-update/pending
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/daily-update.sh
+TimeoutStartSec=1h

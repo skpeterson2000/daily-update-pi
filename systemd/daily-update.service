@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily apt update + upgrade, reboot if packages changed
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/daily-update.sh
+# Allow up to 6 hours total (internet wait + upgrade). 0 = no limit if preferred.
+TimeoutStartSec=6h

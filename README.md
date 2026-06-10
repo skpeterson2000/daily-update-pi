@@ -42,6 +42,12 @@ These behaviours were each added to fix a real failure mode:
   (tmpfs — auto-resets on every boot) counts consecutive *genuinely-offline* checks;
   after ~24h it reboots anyway to flush caches, then keeps retrying. It only counts
   real offline verdicts, so it can never reboot a connected box.
+- **Persistent log that survives the reboot.** journald on this box is
+  `Storage=volatile`, so its logs are wiped by the very reboot each run triggers —
+  you could never inspect a past run. The script also appends every line,
+  timestamped, to `/var/log/daily-update.log` and self-trims it to the last 7 days
+  (no logrotate needed). That file is the durable record of why a run deferred or
+  rebooted.
 - **Wifi power-save disabled.** `networkmanager/wifi-powersave-off.conf` stops the
   radio sleeping when idle, which otherwise made cold-radio probes time out on
   unattended runs.
@@ -64,6 +70,12 @@ sudo systemctl start daily-update.service
 journalctl -u daily-update.service -u daily-update-retry.service -f
 ```
 
+Logs persist across reboots in `/var/log/daily-update.log` (last 7 days):
+
+```sh
+tail -f /var/log/daily-update.log
+```
+
 ## Configure
 
 - **Reboot time:** edit `OnCalendar=*-*-* 04:00:00` in
@@ -79,6 +91,7 @@ journalctl -u daily-update.service -u daily-update-retry.service -f
 | Path | Purpose |
 |------|---------|
 | `daily-update.sh` | the job itself → `/usr/local/sbin/` |
+| `/var/log/daily-update.log` | persistent run log, self-trimmed to 7 days (created at runtime) |
 | `systemd/daily-update.{service,timer}` | the 04:00 daily run |
 | `systemd/daily-update-retry.{service,timer}` | 15-min retry while offline |
 | `networkmanager/wifi-powersave-off.conf` | disable wifi power-save |

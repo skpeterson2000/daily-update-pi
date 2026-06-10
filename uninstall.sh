@@ -20,6 +20,7 @@ systemctl daemon-reload
 rm -f /usr/local/sbin/daily-update.sh
 rm -rf /var/lib/daily-update
 rm -f /run/daily-update/defer-count 2>/dev/null || true
+rm -f /var/log/daily-update.log 2>/dev/null || true
 
 if [ "${1:-}" = "--all" ]; then
     rm -f /etc/NetworkManager/conf.d/wifi-powersave-off.conf

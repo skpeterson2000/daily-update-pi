@@ -28,12 +28,15 @@
 #     /run (resets on every boot) that drives the 24h watchdog reboot.
 #   - daily-update-retry.timer polls every 15min and re-runs this script
 #     (via a unit conditioned on the flag) until it succeeds.
-# Logs to journald via systemd.
+# Logs to journald via systemd, and (because journald here is volatile and wiped
+# by each reboot) also to a persistent, self-trimming file at $LOG_FILE.
 
 set -u
 
 PENDING_FLAG=/var/lib/daily-update/pending
 DEFER_COUNT_FILE=/run/daily-update/defer-count
+LOG_FILE=/var/log/daily-update.log
+LOG_RETENTION_DAYS=7     # persistent log keeps roughly the last week of runs
 MAX_DEFERS=96            # ~24h of retries at one per 15 min -> watchdog reboot
 PROBE_URLS=(
     "https://deb.debian.org/"
@@ -47,7 +50,30 @@ PROBE_GAP=5
 
 mkdir -p "$(dirname "$PENDING_FLAG")"
 
-log() { echo "[daily-update] $*"; }
+# Emit a log line to journald (this oneshot's stdout) AND append it, timestamped,
+# to a persistent file. journald here is volatile (Storage=volatile), so its logs
+# are wiped by the very reboots this script triggers — the file is what survives,
+# so you can still read why a past run deferred or rebooted. prune_log() caps it.
+log() {
+    local line
+    line="$(date '+%Y-%m-%d %H:%M:%S') [daily-update] $*"
+    echo "$line"
+    echo "$line" >> "$LOG_FILE" 2>/dev/null || true
+}
+
+# Trim $LOG_FILE to the last LOG_RETENTION_DAYS days. Every line starts with a
+# "YYYY-MM-DD ..." stamp and ISO dates sort lexicographically, so we keep each
+# line whose date field is >= the cutoff date. No-op if the file is absent.
+prune_log() {
+    [ -f "$LOG_FILE" ] || return 0
+    local cutoff
+    cutoff=$(date -d "$LOG_RETENTION_DAYS days ago" '+%Y-%m-%d' 2>/dev/null) || return 0
+    if awk -v c="$cutoff" 'substr($0,1,10) >= c' "$LOG_FILE" > "$LOG_FILE.tmp" 2>/dev/null; then
+        mv "$LOG_FILE.tmp" "$LOG_FILE"
+    else
+        rm -f "$LOG_FILE.tmp"
+    fi
+}
 
 # Pop a desktop warning into the active graphical session (Wayland/labwc or X11)
 # so a local user sees the reboot coming. Launched via the USER's systemd manager
@@ -134,6 +160,9 @@ It will reboot in 1 minute to refresh, then keep trying to update."
         log "Offline check $n/$MAX_DEFERS since last boot."
     fi
 }
+
+prune_log
+log "Run start (pid $$)."
 
 if check_connectivity; then
     # Confirmed online — any prior offline streak is over, clear the counter.
